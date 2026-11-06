@@ -131,7 +131,13 @@ async def _stream_demo(question: str):
         yield sse("step", {"step": 5, "status": "skipped", "msg": "재검색 건너뜀"})
         docs = initial_docs
 
-    sources = [{"title": d["title"], "url": d["url"]} for d in docs]
+    seen_urls = set()
+    sources = []
+    for d in docs:
+        if d["url"] in seen_urls:
+            continue
+        seen_urls.add(d["url"])
+        sources.append({"title": d["title"], "url": d["url"]})
     context = "\n\n".join(f"[{d['title']}]\n{d['content']}" for d in docs)
 
     # ── Step 3: 스트리밍 답변 — tool 메시지 없는 순수 대화 형식 ──
