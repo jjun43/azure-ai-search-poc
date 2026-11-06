@@ -4,22 +4,40 @@
 
 > 사내 AI 개발 플랫폼에서 요구되는 **RAG / Function Calling / Tool Use 표준 구현체**를 축소판으로 재현한 PoC입니다.
 
-## 왜 만들었나
+## 설계 원칙
 
-운영 환경을 가정한 RAG 서비스는 "검색 → 모델 호출 → 답변"이라는 단순 흐름을 넘어, (1) 모델이 검색 쿼리를 재구성해야 하는지 스스로 판단하고, (2) 필요한 경우 재검색을 수행하며, (3) 생성된 답변의 품질을 다시 모델로 검증하는 흐름까지 포함합니다. 이 PoC는 그 전체 흐름을 **인위적인 지연 없이, 매 단계가 실제 Azure Search / LLM 호출로 구성**되도록 만들었습니다 — 즉 화면에 보이는 모든 단계는 실제로 일어나는 작업입니다.
+운영 수준 RAG 파이프라인이 요구하는 세 가지 흐름을 그대로 구현했습니다.
+
+- **쿼리 재구성 판단** — 모델이 원본 질문을 그대로 쓸지, 검색에 최적화된 쿼리로 재구성할지 스스로 결정
+- **조건부 재검색** — 판단 결과(Tool Call 여부)에 따라 재검색 단계를 거치거나 건너뜀
+- **생성 결과 자체 검증** — 생성된 답변을 같은 모델이 다시 평가 (LLM-as-Judge)
+
+모든 단계는 인위적 지연 없이 실제 Azure Search / LLM 호출로 구성되어 있으며, 화면의 Workflow는 이 호출들을 실시간으로 시각화합니다.
 
 ## 아키텍처 / Workflow
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#eaf4fc',
+  'primaryBorderColor':'#0078d4',
+  'primaryTextColor':'#1b1b1b',
+  'lineColor':'#0078d4',
+  'fontSize':'14px'
+}}}%%
 flowchart LR
-    A[사용자 질문] --> B[초기 검색\nAzure AI Search]
-    B --> C[Function Calling\nGroq LLM]
-    C --> D{도구 호출?}
-    D -- 예 --> E[문서 재검색\nAzure AI Search]
+    A(["사용자 질문"]) --> B["초기 검색<br/>Azure AI Search"]
+    B --> C["Function Calling<br/>Groq LLM"]
+    C --> D{"도구 호출?"}
+    D -- 예 --> E["문서 재검색<br/>Azure AI Search"]
     D -- 아니오 --> F
-    E --> F[LLM 답변 생성\n스트리밍]
-    F --> G[Judge 평가\n자체 채점]
-    G --> H[(결과 표시)]
+    E --> F["답변 생성<br/>스트리밍"]
+    F --> G["Judge 평가<br/>자체 채점"]
+    G --> H(["결과 반환"])
+
+    classDef terminal fill:#0078d4,stroke:#005a9e,stroke-width:1.5px,color:#ffffff;
+    classDef decision fill:#deecf9,stroke:#005a9e,stroke-width:1.5px,color:#1b1b1b;
+    class A,H terminal;
+    class D decision;
 ```
 
 화면의 Workflow 패널은 백엔드가 SSE(Server-Sent Events)로 보내는 `step` / `branch` / `token` / `judge` / `done` 이벤트를 그대로 구독해서, 실제 파이프라인 진행 상태를 블록 단위로 하이라이트합니다. LLM이 "도구를 호출할지 말지" 직접 판단한 결과(예/아니오)에 따라 재검색 여부가 실시간으로 갈립니다.
