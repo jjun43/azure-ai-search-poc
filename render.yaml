@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: azure-ai-search-poc
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: AZURE_SEARCH_ENDPOINT
+        sync: false
+      - key: AZURE_SEARCH_API_KEY
+        sync: false
+      - key: AZURE_SEARCH_INDEX_NAME
+        value: azure-ai-foundry-docs
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_MODEL
+        value: openai/gpt-oss-20b
+      - key: GITHUB_ENDPOINT
+        value: https://api.groq.com/openai/v1

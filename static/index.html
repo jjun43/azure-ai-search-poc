@@ -1,0 +1,365 @@
+/Users/joonsunglee/.zprofile:1: no such file or directory: /opt/homebrew/bin/brew
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Azure AI Search PoC</title>
+<style>
+  :root {
+    --azure: #0078d4;
+    --azure-dark: #005a9e;
+    --azure-light: #deecf9;
+    --pending: #605e5c;
+    --bg: #f3f2f1;
+    --white: #ffffff;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", sans-serif; background: var(--bg); min-height: 100vh; display: flex; flex-direction: column; }
+  header { background: linear-gradient(135deg, #0078d4 0%, #005a9e 100%); color: white; padding: 24px 32px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+  header .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  header .sub { font-size: 13px; opacity: .8; margin-top: 2px; }
+  .badge { margin-left: auto; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35); border-radius: 20px; padding: 4px 14px; font-size: 12px; font-weight: 600; }
+  main { flex: 1; max-width: 1240px; width: 100%; margin: 32px auto; padding: 0 16px; display: flex; flex-direction: column; gap: 20px; }
+  .card { background: var(--white); border-radius: var(--radius); padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  #fileNotice { display: none; background: #fff4ce; border: 1px solid #d0a500; border-radius: var(--radius); padding: 16px; line-height: 1.6; font-size: 14px; }
+  #fileNotice a { color: var(--azure-dark); font-weight: 700; }
+  .card h2 { font-size: 15px; color: var(--pending); font-weight: 600; margin-bottom: 14px; text-transform: uppercase; letter-spacing: .5px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .preset-btn { background: var(--azure-light); color: var(--azure-dark); border: none; border-radius: 20px; padding: 6px 16px; font-size: 13px; cursor: pointer; transition: background .15s; }
+  .preset-btn:hover { background: #c7e0f4; }
+  .preset-btn.active { background: var(--azure); color: white; }
+  textarea { width: 100%; border: 1.5px solid #d2d0ce; border-radius: 8px; padding: 12px; font-size: 14px; font-family: inherit; resize: none; height: 72px; transition: border-color .15s; }
+  textarea:focus { outline: none; border-color: var(--azure); }
+  #startBtn { display: block; width: 100%; margin-top: 16px; padding: 18px; font-size: 20px; font-weight: 700; letter-spacing: .3px; background: linear-gradient(135deg, #0078d4, #005a9e); color: white; border: none; border-radius: var(--radius); cursor: pointer; transition: transform .1s, box-shadow .1s; box-shadow: 0 4px 14px rgba(0,120,212,.4); }
+  #startBtn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,120,212,.5); }
+  #startBtn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+  .workflow-panel { background: #fff; border: 2px solid #a8d2f0; border-radius: 16px; padding: 24px; box-shadow: 0 6px 22px rgba(0,90,158,.1); }
+  .workflow-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+  .workflow-header h2 { color: var(--azure-dark); font-size: 22px; letter-spacing: .2px; }
+  #workflowStatus { color: var(--azure-dark); background: var(--azure-light); border-radius: 999px; padding: 7px 13px; font-size: 14px; font-weight: 700; text-align: right; }
+  .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) 50px repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 10px 30px; }
+  .step { position: relative; min-width: 0; min-height: 158px; background: #fff; border: 2px solid #b7d7ef; border-radius: 14px; padding: 17px 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; transition: border-color .2s, box-shadow .2s, background .2s; }
+  .step::after { content: ''; position: absolute; left: 100%; top: 50%; width: 22px; height: 2px; background: var(--azure); transform: translateY(-50%); z-index: 2; }
+  .step::before { content: ''; position: absolute; left: calc(100% + 22px); top: 50%; width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 7px solid var(--azure); transform: translateY(-50%); z-index: 2; }
+  #step4::after, #step4::before { display: none; }
+  .step.active { color: #fff; border-color: #49b9ff; background: linear-gradient(135deg, #0078d4, #005a9e); animation: pulse 1.5s ease-in-out infinite; }
+  .step.done { border-color: var(--azure-dark); background: linear-gradient(180deg, #fff 0%, #eaf5fd 100%); }
+  .step.skipped { border-style: dashed; color: #667b8c; background: #f4f7fa; }
+  .step.error { border-color: #a4262c; }
+  .step.decision { border-radius: 32px; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(0,120,212,.22); } }
+  .step-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 19px; flex-shrink: 0; background: #e8f3fc; }
+  .step.active .step-icon { background: rgba(255,255,255,.22); }
+  .step-body { min-width: 0; }
+  .step-title { font-size: 15px; font-weight: 700; color: #153d5b; margin-bottom: 7px; line-height: 1.3; }
+  .step-msg { font-size: 14px; color: #506577; line-height: 1.45; overflow-wrap: anywhere; }
+  .step.active .step-title, .step.active .step-msg { color: #fff; }
+  .step.done .step-msg { color: var(--azure-dark); }
+  .step.error .step-msg { color: #a4262c; }
+  .branch-choice { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+  .branch-option { position: relative; display: block; text-align: center; border: 2px solid #b7d7ef; border-radius: 999px; background: #fff; color: var(--azure-dark); padding: 5px 1px; font-size: 14px; font-weight: 700; }
+  .branch-option::before { content: ''; position: absolute; left: -10px; top: 50%; width: 8px; border-top: 2px solid #89bce5; }
+  .branch-choice::before { content: ''; position: absolute; left: -11px; top: 33%; bottom: 33%; border-left: 2px solid #89bce5; }
+  #branchYes::after { content: '➜'; position: absolute; right: -20px; top: 50%; transform: translateY(-50%); color: var(--azure); font-size: 18px; }
+  #branchNo::after { content: '↘'; position: absolute; right: -19px; top: 45%; color: var(--azure); font-size: 19px; }
+  .branch-option.selected { background: var(--azure-dark); border-color: var(--azure-dark); color: #fff; box-shadow: 0 0 0 3px rgba(0,120,212,.16); }
+  .branch-option.muted { opacity: .45; }
+  .workflow-alt { margin-top: 17px; padding: 11px 14px; border: 1px dashed #91c2e7; border-radius: 10px; color: #315a78; background: #f7fbff; font-size: 14px; line-height: 1.4; }
+  .workflow-alt.selected { border-style: solid; border-color: var(--azure-dark); background: var(--azure-light); font-weight: 700; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--azure-light); border-top-color: var(--azure); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 4px; }
+  #answerCard { display: none; }
+  #answerCard.visible { display: block; }
+  #answerCard { background: #10141c; color: #f5f7fb; }
+  #answerCard h2 { color: #b8dfff; }
+  #answerText { font-size: 16px; line-height: 1.8; color: #f5f7fb; min-height: 60px; overflow-wrap: anywhere; }
+  #answerText > :first-child { margin-top: 0; }
+  #answerText > :last-child { margin-bottom: 0; }
+  #answerText p { margin: 0 0 1em; }
+  #answerText h1, #answerText h2, #answerText h3, #answerText h4 { color: #fff; line-height: 1.4; margin: 1.25em 0 .5em; letter-spacing: 0; text-transform: none; }
+  #answerText h1 { font-size: 1.45em; }
+  #answerText h2 { font-size: 1.3em; }
+  #answerText h3, #answerText h4 { font-size: 1.1em; }
+  #answerText strong { color: #fff; font-weight: 700; }
+  #answerText ul, #answerText ol { margin: .35em 0 1em; padding-left: 1.5em; }
+  #answerText li { margin: .25em 0; }
+  #answerText li > p { margin: .2em 0; }
+  #answerText blockquote { margin: 1em 0; padding: .2em 1em; border-left: 3px solid #67bfff; color: #c9d9e8; }
+  #answerText code { background: #263449; color: #bde4ff; border-radius: 4px; padding: .12em .32em; font-size: .92em; }
+  #answerText pre { background: #080d15; border: 1px solid #33465c; border-radius: 8px; padding: 14px; overflow-x: auto; margin: .7em 0 1em; }
+  #answerText pre code { background: none; padding: 0; color: #d8ecff; }
+  #answerText a { color: #7bc9ff; text-decoration: underline; }
+  #answerText a:hover { color: #b8e2ff; }
+  #answerText hr { border: 0; border-top: 1px solid #425166; margin: 1.2em 0; }
+  #answerText table { border-collapse: collapse; display: block; overflow-x: auto; margin: 1em 0; }
+  #answerText th, #answerText td { border: 1px solid #425166; padding: 6px 10px; }
+  #answerText th { background: #223047; }
+  .cursor { display: inline-block; width: 2px; height: 1em; background: #7bc9ff; animation: blink .6s step-end infinite; vertical-align: text-bottom; margin-left: 1px; }
+  @keyframes blink { 50% { opacity: 0; } }
+  #sourcesCard { display: none; }
+  #sourcesCard.visible { display: block; }
+  #judgeCard { display: none; }
+  #judgeCard.visible { display: block; }
+  .scores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .score-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 7px; }
+  .score-track { height: 10px; background: #edebe9; border-radius: 10px; overflow: hidden; }
+  .score-fill { width: 0; height: 100%; background: var(--azure); border-radius: 10px; transition: width .5s ease; }
+  .score-note { margin-top: 14px; color: var(--pending); font-size: 12px; }
+  #sourcesList { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .source-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--azure-light); border-radius: 8px; text-decoration: none; color: var(--azure-dark); font-size: 13px; font-weight: 600; transition: background .15s; }
+  .source-item:hover { background: #c7e0f4; }
+  #timer { text-align: center; font-size: 26px; font-weight: 700; color: var(--azure); font-variant-numeric: tabular-nums; }
+  footer { text-align: center; padding: 20px; font-size: 12px; color: #a19f9d; }
+  @media (max-width: 760px) {
+    .workflow-panel { padding: 18px; }
+    .workflow-header { align-items: flex-start; flex-direction: column; }
+    .flow { grid-template-columns: 1fr; gap: 12px; }
+    .step { min-height: 86px; flex-direction: row; justify-content: flex-start; text-align: left; padding: 14px; }
+    .step::after, .step::before { display: none; }
+    .step.decision { border-radius: 14px; }
+    .branch-choice { flex-direction: row; justify-content: center; }
+    .branch-choice::before, .branch-option::before, #branchYes::after, #branchNo::after { display: none; }
+    .branch-option { min-width: 88px; padding: 7px 12px; }
+    .scores { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) { .step.active, .score-fill, .spinner, .cursor { animation: none; transition: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="logo">⚡ Azure AI Search PoC</div>
+    <div class="sub">Azure AI Search · Groq GPT-OSS 20B · Function Calling</div>
+  </div>
+  <span class="badge">Free Tier Demo</span>
+</header>
+<main>
+  <div id="fileNotice" role="alert">이 화면은 백엔드 서버와 함께 실행해야 합니다. 터미널에서 <code>source .venv/bin/activate</code> 후 <code>uvicorn main:app --host 127.0.0.1 --port 8200 --reload</code>를 실행하고 <a href="http://127.0.0.1:8200">http://127.0.0.1:8200</a>에서 열어 주세요.</div>
+  <div class="card">
+    <button id="startBtn" onclick="startDemo()">▶ 데모 시작</button>
+    <h2 style="margin-top:20px">질문 선택 또는 직접 입력</h2>
+    <div class="presets" id="presets">
+      <button class="preset-btn active" onclick="selectPreset(this, 'Azure AI Foundry란 무엇인가요?')">Azure AI Foundry란?</button>
+      <button class="preset-btn" onclick="selectPreset(this, 'Azure AI Search로 RAG를 어떻게 구현하나요?')">RAG 구현 방법</button>
+      <button class="preset-btn" onclick="selectPreset(this, 'Phi-4 모델의 특징과 사용 방법은?')">Phi-4 모델</button>
+      <button class="preset-btn" onclick="selectPreset(this, 'Function Calling이란 무엇이고 어떻게 활용하나요?')">Function Calling</button>
+    </div>
+    <textarea id="question" placeholder="질문을 입력하세요...">Azure AI Foundry란 무엇인가요?</textarea>
+  </div>
+  <div id="timer" style="display:none">⏱ <span id="timerVal">0.0</span>초</div>
+  <section class="workflow-panel" aria-label="Workflow">
+    <div class="workflow-header">
+      <h2>Workflow</h2>
+      <span id="workflowStatus" aria-live="polite">질문 입력 대기 중</span>
+    </div>
+    <div class="flow" aria-label="검색 및 답변 처리 흐름">
+      <div class="step" id="step0"><div class="step-icon">💬</div><div class="step-body"><div class="step-title">사용자 질문</div><div class="step-msg" id="step0msg">대기 중</div></div></div>
+      <div class="step" id="step1"><div class="step-icon">🔍</div><div class="step-body"><div class="step-title">초기 검색</div><div class="step-msg" id="step1msg">대기 중</div></div></div>
+      <div class="step" id="step2"><div class="step-icon">⚙️</div><div class="step-body"><div class="step-title">Function Calling</div><div class="step-msg" id="step2msg">대기 중</div></div></div>
+      <div class="step decision" id="stepDecision"><div class="step-icon">◆</div><div class="step-body"><div class="step-title">도구 호출?</div><div class="step-msg" id="stepDecisionmsg">판단 대기 중</div></div></div>
+      <div class="branch-choice" aria-label="도구 호출 결과"><span class="branch-option" id="branchYes">예</span><span class="branch-option" id="branchNo">아니오</span></div>
+      <div class="step" id="step5"><div class="step-icon">📄</div><div class="step-body"><div class="step-title">문서 재검색</div><div class="step-msg" id="step5msg">대기 중</div></div></div>
+      <div class="step" id="step3"><div class="step-icon">🤖</div><div class="step-body"><div class="step-title">LLM 답변</div><div class="step-msg" id="step3msg">대기 중</div></div></div>
+      <div class="step" id="step4"><div class="step-icon">📊</div><div class="step-body"><div class="step-title">Judge 평가</div><div class="step-msg" id="step4msg">대기 중</div></div></div>
+    </div>
+    <div class="workflow-alt" id="workflowAlt">아니오 경로: 재검색을 건너뛰고 초기 검색 문서로 LLM 답변 생성</div>
+  </section>
+  <div class="card" id="answerCard">
+    <h2>답변</h2>
+    <div id="answerText"></div>
+  </div>
+  <div class="card" id="judgeCard">
+    <h2>LLM 평가</h2>
+    <div class="scores">
+      <div><div class="score-label"><span>질문 관련성</span><strong id="relevanceValue">0%</strong></div><div class="score-track"><div class="score-fill" id="relevanceBar"></div></div></div>
+      <div><div class="score-label"><span>답변 완결성</span><strong id="completenessValue">0%</strong></div><div class="score-track"><div class="score-fill" id="completenessBar"></div></div></div>
+      <div><div class="score-label"><span>근거 부합도</span><strong id="confidenceValue">0%</strong></div><div class="score-track"><div class="score-fill" id="confidenceBar"></div></div></div>
+    </div>
+    <p class="score-note">이 점수는 LLM의 자체 평가이며, 정답 여부를 검증한 결과는 아닙니다.</p>
+  </div>
+  <div class="card" id="sourcesCard">
+    <h2>📚 참고 문서</h2>
+    <div id="sourcesList"></div>
+  </div>
+</main>
+<footer>Powered by Azure AI Search · Groq GPT-OSS 20B · FastAPI</footer>
+<script src="vendor/markdown-it.umd.min.js"></script>
+<script>
+  if (location.protocol === 'file:') {
+    document.getElementById('fileNotice').style.display = 'block';
+    document.getElementById('startBtn').disabled = true;
+  }
+  const PRESETS = document.querySelectorAll('.preset-btn');
+  const markdown = window.markdownit({ html: false, linkify: true, breaks: true });
+  markdown.disable('image');
+  markdown.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+    tokens[idx].attrSet('target', '_blank');
+    tokens[idx].attrSet('rel', 'noopener noreferrer');
+    return self.renderToken(tokens, idx, options);
+  };
+  function selectPreset(btn, text) {
+    PRESETS.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('question').value = text;
+  }
+  document.getElementById('question').addEventListener('input', () => {
+    PRESETS.forEach(b => b.classList.remove('active'));
+  });
+  let timerInterval = null, startTime = 0;
+  function startTimer() {
+    startTime = performance.now();
+    document.getElementById('timer').style.display = 'block';
+    timerInterval = setInterval(() => {
+      document.getElementById('timerVal').textContent = ((performance.now() - startTime) / 1000).toFixed(1);
+    }, 100);
+  }
+  function stopTimer() {
+    clearInterval(timerInterval);
+    document.getElementById('timerVal').textContent = ((performance.now() - startTime) / 1000).toFixed(1);
+  }
+  function setStep(n, status, msg) {
+    const el = document.getElementById('step' + n);
+    const msgEl = document.getElementById('step' + n + 'msg');
+    el.className = 'step' + (n === 'Decision' ? ' decision' : '') + (status ? ' ' + status : '');
+    msgEl.textContent = msg;
+    if (status === 'active') {
+      const spinner = document.createElement('span');
+      spinner.className = 'spinner';
+      msgEl.prepend(spinner);
+      document.getElementById('workflowStatus').textContent = msg;
+    }
+  }
+  function setBranch(choice, msg) {
+    setStep('Decision', 'done', msg);
+    document.getElementById('branchYes').className = 'branch-option ' + (choice === 'yes' ? 'selected' : 'muted');
+    document.getElementById('branchNo').className = 'branch-option ' + (choice === 'no' ? 'selected' : 'muted');
+    document.getElementById('workflowAlt').classList.toggle('selected', choice === 'no');
+    document.getElementById('workflowStatus').textContent = msg;
+  }
+  function showScores(scores) {
+    for (const key of ['relevance', 'completeness', 'confidence']) {
+      const value = scores[key];
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) return;
+    }
+    document.getElementById('judgeCard').classList.add('visible');
+    for (const key of ['relevance', 'completeness', 'confidence']) {
+      const percent = Math.round(scores[key] * 100);
+      document.getElementById(key + 'Value').textContent = percent + '%';
+      document.getElementById(key + 'Bar').style.width = percent + '%';
+    }
+  }
+  function resetUI() {
+    [0,1,2,3,4,5].forEach(n => setStep(n, '', '대기 중'));
+    setStep('Decision', '', '판단 대기 중');
+    document.getElementById('branchYes').className = 'branch-option';
+    document.getElementById('branchNo').className = 'branch-option';
+    document.getElementById('workflowAlt').classList.remove('selected');
+    document.getElementById('workflowStatus').textContent = '질문 입력 대기 중';
+    document.getElementById('answerCard').classList.remove('visible');
+    document.getElementById('judgeCard').classList.remove('visible');
+    document.getElementById('sourcesCard').classList.remove('visible');
+    document.getElementById('answerText').replaceChildren();
+    document.getElementById('sourcesList').replaceChildren();
+    for (const key of ['relevance', 'completeness', 'confidence']) {
+      document.getElementById(key + 'Value').textContent = '0%';
+      document.getElementById(key + 'Bar').style.width = '0%';
+    }
+    document.getElementById('timerVal').textContent = '0.0';
+  }
+  async function startDemo() {
+    const question = document.getElementById('question').value.trim();
+    if (!question) return;
+    resetUI(); startTimer();
+    setStep(0, 'done', '질문 접수 완료');
+    document.getElementById('workflowStatus').textContent = '질문 접수 완료';
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('startBtn').textContent = '⏳ 처리 중...';
+    const answerCard = document.getElementById('answerCard');
+    const answerText = document.getElementById('answerText');
+    let cursor = null;
+    let answerMarkdown = '';
+    let renderFrame = null;
+    function renderAnswer() {
+      if (renderFrame !== null) cancelAnimationFrame(renderFrame);
+      renderFrame = null;
+      answerText.innerHTML = markdown.render(answerMarkdown);
+      if (cursor) answerText.appendChild(cursor);
+    }
+    try {
+      const resp = await fetch('/demo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question }),
+      });
+      if (!resp.ok || !resp.body) throw new Error(`서버 응답 오류 (${resp.status})`);
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop();
+        for (const part of parts) {
+          if (!part.trim()) continue;
+          const lines = part.split('\n');
+          let event = '', data = '';
+          for (const line of lines) {
+            if (line.startsWith('event: ')) event = line.slice(7);
+            if (line.startsWith('data: '))  data  = line.slice(6);
+          }
+          if (!data) continue;
+          const payload = JSON.parse(data);
+          if (event === 'step') { setStep(payload.step, payload.status, payload.msg); }
+          else if (event === 'branch') { setBranch(payload.choice, payload.msg); }
+          else if (event === 'hold') { document.getElementById('workflowStatus').textContent = payload.msg; }
+          else if (event === 'judge') { showScores(payload.scores); }
+          else if (event === 'token') {
+            if (!answerCard.classList.contains('visible')) {
+              answerCard.classList.add('visible');
+              cursor = document.createElement('span');
+              cursor.className = 'cursor';
+            }
+            answerMarkdown += payload.token;
+            if (renderFrame === null) renderFrame = requestAnimationFrame(renderAnswer);
+          }
+          else if (event === 'done') {
+            cursor = null;
+            renderAnswer();
+            stopTimer();
+            document.getElementById('workflowStatus').textContent = '모든 단계 완료';
+            if (payload.sources && payload.sources.length > 0) {
+              const sc = document.getElementById('sourcesCard');
+              const sl = document.getElementById('sourcesList');
+              sc.classList.add('visible');
+              payload.sources.forEach(s => {
+                const a = document.createElement('a');
+                a.className = 'source-item';
+                if (!/^https:\/\//i.test(s.url)) return;
+                a.href = s.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+                a.textContent = '📄 ' + s.title;
+                sl.appendChild(a);
+              });
+            }
+          }
+          else if (event === 'error') { throw new Error(payload.message || '처리 중 오류가 발생했습니다'); }
+        }
+      }
+    } catch (e) {
+      if (renderFrame !== null) cancelAnimationFrame(renderFrame);
+      cursor = null;
+      answerText.textContent = '오류가 발생했습니다: ' + e.message;
+      answerCard.classList.add('visible');
+      stopTimer();
+      document.getElementById('workflowStatus').textContent = '오류 발생';
+    }
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('startBtn').textContent = '▶ 데모 시작';
+  }
+</script>
+</body>
+</html>
+
