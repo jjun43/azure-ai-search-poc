@@ -148,7 +148,9 @@ async def _stream_demo(question: str):
         {"role": "system", "content":
             "You are an Azure AI expert assistant. "
             "Answer the question in Korean based on the provided search results. "
-            "Keep answers under 300 words."},
+            "Keep the ENTIRE answer, including any table, under 350 words. "
+            "Always finish the answer completely — never leave a sentence or a table row unfinished. "
+            "If you use a table, keep it short (at most 4 rows) so it fits within the word limit."},
         {"role": "user", "content":
             f"다음 검색 결과를 참고해서 질문에 답해주세요.\n\n"
             f"[검색 결과]\n{context}\n\n"
@@ -157,7 +159,7 @@ async def _stream_demo(question: str):
 
     def _stream():
         return gh_client.chat.completions.create(
-            model=MODEL, messages=answer_messages, stream=True, max_tokens=500,
+            model=MODEL, messages=answer_messages, stream=True, max_tokens=850,
         )
 
     stream = await asyncio.to_thread(_stream)
@@ -174,7 +176,7 @@ async def _stream_demo(question: str):
             token = chunk.choices[0].delta.content
             answer_parts.append(token)
             yield sse("token", {"token": token})
-            await asyncio.sleep(0.02)  # 토큰 출력 속도 조절
+            await asyncio.sleep(0.015)  # 토큰 출력 속도 조절
     yield sse("step", {"step": 3, "status": "done", "msg": "답변 완료 ✅"})
     yield sse("step", {"step": 4, "status": "active", "msg": "답변 품질 평가 중..."})
     try:
